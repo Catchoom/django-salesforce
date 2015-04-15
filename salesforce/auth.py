@@ -56,6 +56,20 @@ def authenticate(db_alias=None, settings_dict=None):
 			if settings_dict['USER'] == 'dynamic auth':
 				settings_dict = settings_dict or connections[db_alias].settings_dict
 				oauth_data[db_alias] = {'instance_url': settings_dict['HOST']}
+			elif settings_dict['USER'] == 'auth token':
+				url = ''.join([settings_dict['HOST'], '/services/oauth2/token'])
+				response = requests.post(url, data=dict(
+					grant_type      = "refresh_token",
+					client_id		= settings_dict['CONSUMER_KEY'],
+					client_secret	= settings_dict['CONSUMER_SECRET'],
+					refresh_token	= settings_dict['TOKEN'],
+				))
+
+				if response.status_code == 200:
+					log.info("successfully authenticated %s" % settings_dict['USER'])
+					oauth_data[db_alias] = response.json()
+				else:
+					raise LookupError("oauth failed: %s: %s" % (settings_dict['USER'], response.text))
 			else:
 				url = ''.join([settings_dict['HOST'], '/services/oauth2/token'])
 				
