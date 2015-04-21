@@ -13,6 +13,8 @@ conversion).
 
 from django.conf import settings
 
+from salesforce import auth
+
 try:
     import beatbox
 except ImportError:
@@ -46,11 +48,17 @@ def convert_lead(lead, converted_status="Qualified - converted"):
     # our `beatbox` client.
     if "test.salesforce.com" in settings_dict['HOST']:
         soap_client.serverUrl = 'https://test.salesforce.com/services/Soap/u/33.0'
-    soap_client.login(settings_dict['USER'], settings_dict['PASSWORD'])
+    if settings_dict['USER'] == 'auth token':
+        token = auth.authenticate()['access_token']
+        soap_client.useSession(token, settings_dict["SOAP_URL"])
+    else:
+        soap_client.login(settings_dict['USER'], settings_dict['PASSWORD'])
 
     response = soap_client.convertLead({
         'leadId': lead.pk,
         'convertedStatus': converted_status,
+        'doNotCreateOpportunity': True,
+        'ownerId': settings.SALESFORCE_OWNER_ID,
     })
 
     if "Exception" in str(response):
