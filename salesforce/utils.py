@@ -108,7 +108,7 @@ def convert_lead(lead, converted_status=None, **kwargs):
     if "test.salesforce.com" in settings_dict['HOST']:
         soap_client.serverUrl = 'https://test.salesforce.com/services/Soap/u/33.0'
     if settings_dict['USER'] == 'auth token':
-        auth_data = auth.authenticate()
+        auth_data = connections[db_alias].sf_session.auth.get_auth()
         soap_url = str(auth_data['instance_url']) + settings_dict["SOAP_URL"]
         soap_client.useSession(auth_data['access_token'], soap_url)
     else:
