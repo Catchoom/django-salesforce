@@ -11,6 +11,7 @@ a workaround for those specific actions (such as Lead-Contact
 conversion).
 """
 
+from django.conf import settings
 from django.db import connections
 from .backend.driver import DatabaseError, InterfaceError
 import salesforce
@@ -98,6 +99,7 @@ def convert_lead(lead, converted_status=None, **kwargs):
     if converted_status is None:
         converted_status = connections[db_alias].introspection.converted_lead_status
     soap_client = get_soap_client(db_alias)
+    settings_dict = settings.DATABASES['salesforce']
 
     # By default `beatbox` will assume we are trying to log in with a
     # production account (i.e., using login.salesforce.com). If we want
