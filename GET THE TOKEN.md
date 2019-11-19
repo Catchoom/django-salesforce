@@ -7,7 +7,7 @@ https://login.salesforce.com/services/oauth2/authorize
 client_id:xyzzyg9rbsTkKnAUNPxvJNeDie.vUg87NuTTB.SAwQBUkFfw3_vXwR0LD3jeWm1GUUX9COwnESvMOYcF4Z8j2
 response_type:code
 redirect_uri:https://timetrade.com/whatIsTheURL
-scope:refresh_token
+scope:refresh_token+id+api+web+full+chatter_api+visualforce+openid+custom_permissions
 ```
 
 That will give you an HTML page with a login to SF.  When you use the URL in that page to login and grant access to the app, it redirects to --
