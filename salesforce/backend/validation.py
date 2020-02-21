@@ -6,11 +6,10 @@
 #
 
 """
-Default validation code.
+Default validation code.  (like django.db.backends.*.validation)
 """
+from django.db.backends.base.validation import BaseDatabaseValidation
 
-from django.db.backends import BaseDatabaseValidation
 
 class DatabaseValidation(BaseDatabaseValidation):
-	pass
-
+    pass

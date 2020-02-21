@@ -4,31 +4,32 @@ django-salesforce
 .. image:: https://travis-ci.org/django-salesforce/django-salesforce.svg?branch=master
    :target: https://travis-ci.org/django-salesforce/django-salesforce
 
+.. image:: https://badge.fury.io/py/django-salesforce.svg
+   :target: https://pypi.python.org/pypi/django-salesforce
+
+.. image:: https://img.shields.io/badge/Python-2.7.9%2B%2C%203.5%2C%203.6%2C%203.7-brightgreen.svg
+   :target: https://www.python.org/
+
+.. image:: https://img.shields.io/badge/Django-1.11%2C%202.0%2C%202.1%2C%202.2%2C%203.0-blue.svg
+   :target: https://www.djangoproject.com/
+
 This library allows you to load and edit the objects in any Salesforce instance
 using Django models. The integration is fairly complete, and generally seamless
 for most uses. It works by integrating with the Django ORM, allowing access to
-the objects in your SFDC instance as if they were in a traditional database.
+the objects in your SFDC instance (Salesforce .com) as if they were in a
+traditional database.
 
-Python 2.6, 2.7, 3.3, 3.4 or pypy; Django 1.4.2 - 1.7. Note that Django 1.4.x
-is not compatible with Python 3.
+Python 2.7.9+, 3.5 to 3.8, Django 1.11, 2.0 to 3.0.
+
+Pre-2.7.9 Python versions don't support the protocol TLS 1.1+ required
+by Salesforce. New PyPy versions compatible with TLS 1.1+ are supported also.
 
 Quick Start
 -----------
 
 1. Install django-salesforce: ``pip install django-salesforce``
 
-2. Add the ``salesforce`` app to your ``INSTALLED_APPS`` setting::
-
-    INSTALLED_APPS = {
-        "django.contrib.auth",
-        "django.contrib.contenttypes",
-        ...
-        ...
-        "salesforce"
-    }
-
-
-3. Add a salesforce connection to your ``DATABASES`` setting::
+2. Add a salesforce connection to your ``DATABASES`` setting::
 
     'salesforce': {
         'ENGINE': 'salesforce.backend',
@@ -45,6 +46,7 @@ Quick Start
      connect to your Salesforce account. Instructions for how get these are in
      the Salesforce REST API Documentation. Key and secret can be created on
      web by:
+
      - Salesforce web > Setup > App Setup > Create > Apps > Connected apps >
        New.
      - Click "Enable OAuth Settings" in API, then select "Access and manage
@@ -54,7 +56,7 @@ Quick Start
    * ``PASSWORD`` is a concatenation of the user's password and security token.
      Security token can be omitted if the local IP address has been
      whitelisted in Security Controls / Network Access.
-   * ``HOST`` is ``https://test.salesforce.com`` to access the sandbox, or
+   * ``HOST`` is ``https://test.salesforce.com`` to access a sandbox, or
      ``https://login.salesforce.com`` to access production.
 
    If an error message is received while connecting, review the error received.
@@ -69,86 +71,81 @@ Quick Start
    models. Introspection (inspectdb) doesn't require any permissions. Running
    tests for django_salesforce requires many permissions or Administrator
    account for sandbox.
+   
+   **Note about permissions**: Administrator rights are only required to run
+   the full suite of unit tests; otherwise, as long as the account has rights to
+   read or modify the chosen object, everything should work properly.
 
-4. **(optional)** To override the default timeout of 15 seconds,
-   define ``SALESFORCE_QUERY_TIMEOUT`` in your settings file::
-
-    SALESFORCE_QUERY_TIMEOUT = 15
-
-5. **(optional)** If you want to use another name for your Salesforce DB
-   connection, define ``SALESFORCE_DB_ALIAS`` in your settings file::
-
-    SALESFORCE_DB_ALIAS = 'salesforce'
-
-6. Add ``salesforce.router.ModelRouter`` to your ``DATABASE_ROUTERS``
+3. Add ``salesforce.router.ModelRouter`` to your ``DATABASE_ROUTERS``
    setting::
 
     DATABASE_ROUTERS = [
         "salesforce.router.ModelRouter"
     ]
 
-7. Define a model that extends ``salesforce.models.Model`` or export the
+   (This is important for switching between 'salesforce' database for
+   models derived from SalesforceModel and 'default' database for normal models
+   with tables created by migrations, especially for 'django.contrib'.)
+
+4. Add the ``salesforce`` app to your ``INSTALLED_APPS`` setting::
+
+    INSTALLED_APPS = {
+        "django.contrib.auth",
+        "django.contrib.contenttypes",
+        ...
+        ...
+        "salesforce"
+    }
+
+   (This is necessary for running Salesforce extensions in the command
+   ``inspectdb --database=salesforce`` in development, otherwise it is
+   not important.)
+
+
+5. Define a model that extends ``salesforce.models.Model`` (alias SalesforceModel) or export the
    complete SF schema by ``python manage.py inspectdb --database=salesforce``
    and simplify it to what you need.
 
+6. **(optional)** To override the default timeout of 15 seconds,
+   define ``SALESFORCE_QUERY_TIMEOUT`` in your settings file.
+   It can be one number or better a tuple with a short value for connection
+   timeout and a longer value that includes time for running a query,
+   but never need be longer than 30 seconds::
+
+    SALESFORCE_QUERY_TIMEOUT = (4, 15)  # default (connect timeout, data timeout)
+
+7. **(optional)** If you want to use another name for your Salesforce DB
+   connection, define ``SALESFORCE_DB_ALIAS`` in your settings file::
+
+    SALESFORCE_DB_ALIAS = 'salesforce'  # default
+
 8. You're all done! Just use your model like a normal Django model.
 
-9. (Optional) Create a normal Django admin.py module for your Salesforce model.
+9. **(optional)** Create a normal Django ``admin.py`` module for your Salesforce model::
+
+    from salesforce.testrunner.example.universal_admin import register_omitted_classes
+    # some admin classes that you wrote manually yet
+    # ...
+    # end of file
+    register_omitted_classes(your_application.models)
+
+   This is a rudimentary way to verify that every model works in sandbox, before
+   hand-writing all admin classes. (Foreign keys to huge tables in the production
+   require customized admins e.g. with search widgets.)
+    
+10. **(optional)** By default, the Django ORM connects to all DBs at startup. To delay
+    SFDC connections until they are actually required, define ``SF_LAZY_CONNECT=True``
+    in your settings file. Be careful when using this setting; since it won't fail during
+    the application boot, it's possible for a bad password to be sent repeatedly,
+    requiring an account reset to fix.
 
 Primary Key
 -----------
 Salesforce doesn't allow you to define custom primary keys, so django-salesforce
 will add them automatically in all cases. You can override capitalization and use
-primary key `id` by configuring `SF_PK='id'` in your project settings. The previous
-capitalization of `Id` is only for old projects, but it will stay as the default
-variant until `django-salesforce>=0.5`.
-
-Foreign Key Support
--------------------
-
-**Foreign key** filters are currently possible only for the first level of
-relationship and only for fields whose name equals the name of object.
-Foreign keys of an object can be normally accessed by dot notation without any
-restriction
-Example::
-
-    contacts = Contact.objects.filter(Account__Name='FOO Company')
-    print(contacts[0].Account.Owner.LastName)
-
-But the relationship ``Owner__Name`` is not currently possible because the
-type of ``Owner`` is a different name (``User``).
-
-Along similar lines, it's not currently possible to filter by `ForeignKey`
-relationships based on a custom field. This is because related objects
-(Lookup field or Master-Detail Relationship) use two different names in
-`SOQL <http://www.salesforce.com/us/developer/docs/soql_sosl/>`__. If the
-relation is by ID the columns are named `FieldName__c`, whereas if the relation
-is stored by object the column is named `FieldName__r`. More details about
-this can be found in the discussion about `#43 <https://github.com/freelancersunion/django-salesforce/issues/43>`__.
-
-In case of a ForeignKey you can specify the field name suffixed with ``_id``,
-as it is automatically allowed by Django. For example: ``account_id`` instead
-of ``account.id``, or ``AccountId`` instead of ``Account.Id``. It is faster,
-if you need not to access to the related ``Account`` object.
-
-Querysets can be easily inspected whether they are correctly compiled to SOQL.
-You can compare the meaning with the same compiled to SQL::
-
-    my_qs = Contact.objects.filter(my__little_more__complicated='queryset')
-    print my_qs.query.get_compiler('salesforce').as_sql()    # SOQL
-    print my_qs.query.get_compiler('default').as_sql()       # SQL
-
-**Generic foreign keys** are frequently used in SF for fields that relate to
-objects of different types, e.g. the Parent of Note or Attachment can be almost
-any type of ususal SF objects. Filters by `Parent.Type` and retrieving this
-type is now supported::
-
-    note = Note.objects.filter(parent_type='Contact')[0]
-    parent_model = getattr(example.models, note.parent_type)
-    parent_object = parent_model.objects.get(pk=note.parent_id)
-    assert note.parent_type == 'Contact'
-
-Example of `Note` model is in `salesforce.testrunner.example.models.Note`.
+primary key ``id`` by configuring ``SF_PK='id'`` in your project settings. The previous
+capitalization of ``Id`` is only for old projects, but it will stay as the default
+variant until ``django-salesforce>=0.5``.
 
 Advanced usage
 --------------
@@ -158,20 +155,24 @@ Advanced usage
 
 -  **Testing** - By default, tests will be run against the SFDC connection
    specified in settings.py, which will substantially increase testing time.
-   
+
    One way to speed this up is to change the SALESFORCE_DB_ALIAS to point to
    another DB connection (preferably SQLite) during testing using the
-   ``TEST_*`` settings variables. The only outbound connections will then be to
-   the authentication servers.
+   ``TEST_*`` settings variables. Such simple tests can run without any network
+   access. Django unit tests without SalesforceModel
+   are fast everytimes. Special read only fields that are updated only by SFDC
+   e.g. ``last_modified_date`` need more parameters to be possible to save them
+   into an alternate database, e.g. by ``auto_now=True`` or to play with
+   ``null=True`` or ``default=...``.
    
 -  **Multiple SFDC connections** - In most cases, a single connection is all
    that most apps require, so the default DB connection to use for Salesforce
    is defined by the ``SALESFORCE_DB_ALIAS`` settings variable. This behavior
    can be also configured by ``DATABASE_ROUTERS``, replacing the use of
-   salesforce.backend.router.ModelRouter.
+   salesforce.router.ModelRouter.
 
 -  **Non SF databases** - If ``SALESFORCE_DB_ALIAS`` is set to a conventional
-   database, the tables defined by the SF models will be created by syncdb. This
+   database, the tables defined by the SF models will be created by ``migrate``. This
    behavior can be disabled by adding a Meta class with ``managed=False``.
 
 -  **Custom Managers** - When creating a custom manager for a model, the manager
@@ -186,7 +187,7 @@ Advanced usage
    deduced from Django field name, if no ``db_column`` is specified::
 
      last_name = models.CharField(max_length=80)     # db_column='LastName'
-     FirstName = models.CharField(max_length=80)    # db_column='FirstName'
+     FirstName = models.CharField(max_length=80)     # db_column='FirstName'
      custom_bool = models.BooleanField(custom=True)  # db_column='CustomBool__c'
    
    Fields named with an upper case character are never modified, except for the
@@ -204,41 +205,44 @@ Advanced usage
    Also namespace prefixes of managed packages (prefixed with "PackageName\__"
    can be automatically applied to custom fields without db_column.
 
--  **Meta class options** - If an inner ``Meta`` class is used, it must be a
-   descendant of ``SalesforceModel.Meta`` or must have ``managed=False``.
+-  **Query deleted objects** - Deleted objects that are in trash bin are
+   not selected by a normal queryset, but if a special method ``query_all``
+   is used then also deleted objects are searched.
+   If a trash bin is supported by the model then a boolean field ``IsDeleted``
+   can be in the model and it is possible to select only deleted objects ::
 
--  **Database Introspection with inspectdb** Tables that are exported into a
-   Python model can be restricted by regular expression::
+     deleted_list = list(Lead.objects.filter(IsDeleted=True).query_all())
 
-     python manage.py inspectdb --table-filter="Contact$|Account" --database=salesforce
+-  **Migrations** - Migrations can be used for an alternate test database
+   with SalesforceModel. Then all tables must have Meta options ``db_table``
+   and fields must have option ``db_column``, which can be got
+   by ``inspectdb`` with ``--verbosity=2``. Models exported by introspection
+   ``inspectdb`` do not specify the option ``managed`` because the
+   default value True is considered safe.
+   (Migrations in SFDC are not supported. If anything would
+   be implemented after all, only explicitly clearly selected fields and models
+   could be migrated in explicitly labeled SFDC databases.
+   Consequently, the setting ``managed = True`` is related only to an alternate
+   non SFDC database configured by ``SALESFORCE_DB_ALIAS``.)
 
-   In this example, inspectdb will only export models for tables with exact
-   name ``Contact`` and all tables that are prefixed with ``Account``. This
-   filter works with all supported database types.
+-  **Exceptions** - Custom exceptions instead of standard Django database
+   exceptions are raised by Django-Salesforce to get more useful information.
+   General exceptions are ``SalesforceError`` or a more general custom
+   ``DatabaseError``. They can be imported from ``salesforce.dbapi.exceptions``
+   if database errors should be handled specifically in your app.
 
--  **Accessing the Salesforce SOAP API** - There are some Salesforce actions that cannot or can hardly
-   be implemented using the generic relational database abstraction and the REST API.
-   For some of these actions there is an available endpoint in the old Salesforce API
-   (SOAP) that can be accessed using our utility module. In order to use that module,
-   you will need to install an additional dependency ::
+Foreign Key Support
+-------------------
+Foreign key relationships should work as expected, but mapping
+Salesforce SOQL to a purely-relational mapper is a leaky abstraction. For the
+gory details, see `Foreign Key Support <https://github.com/django-salesforce/django-salesforce/wiki/Foreign-Key-Support>`__
+on the Django-Salesforce wiki.
 
-     pip install beatbox
-
-   Here is an example of usage with ``Lead`` conversion ::
-
-     from salesforce.utils import convert_lead
-
-     lead = Lead.objects.all()[0]
-     response = convert_lead(lead)
-
-   For the particular case of ``Lead`` conversion, beware that having
-   some *custom* and *required* fields in either ``Contact``,
-   ``Account`` or ``Opportunity`` is not supported. This arises from
-   the fact that the conversion mechanism on the Salesforce side is only
-   meant to deal with standard Salesforce fields, so it does not really
-   care about populating custom fields at insert time.
-
-
+Introspection and special attributes of fields
+----------------------------------------------
+Some Salesforce fields can not be fully used without special attributes, namely
+read-only and default value fields. Further details can be found in
+`Introspection and Special Attributes of Fields <https://github.com/django-salesforce/django-salesforce/wiki/Introspection-and-Special-Attributes-of-Fields>`__
 
 Caveats
 -------
@@ -253,71 +257,34 @@ here are the potential pitfalls and unimplemented operations:
    are specific to their individual applications' needs. Models that have
    been included with this library are for example and documentation
    purposes.
--  **Inheritence** — When using the default router, all models for object
+-  **Inheritance** — When using the default router, all models for object
    types on Salesforce must extend salesforce.models.SalesforceModel. The
    model router checks for this to determine which models to handle through
    the Salesforce connection.
--  **Multiple Updates** — Multiple update support is not yet
-   implemented.
--  **Multiple Deletes** — Multiple delete support is not yet
-   implemented.
--  **Database Sync** — ``syncdb`` will only create new databases in non-SF
+-  **Database Migrations** — ``migrate`` will only create new tables; in non-SF
    databases (useful for unit tests); SFDC classes are assumed to already
    exist with the appropriate permissions.
 
-Experimental Features
----------------------
-
--  If you use multiple Salesforce databases or multiple instances of AdminSite, you'll
-   probably want to extend ``salesforce.admin.RoutedModelAdmin``" in your admin.py
-
--  **Dynamic authorization** - The original use-case for django-salesforce assumed
-   use of a single set of credentials with read-write access to all necessary objects.
-   It's now possible to write applications that use OAuth to interact with a Salesforce
-   instance's data on your end user's behalf. You simply need to know or request the 
-   `Access Token <https://www.salesforce.com/us/developer/docs/api_rest/Content/quickstart_oauth.htm>`
-   for the user in question. In this situation, it's not necessary to save any credentials
-   for SFDC in Django settings. The manner in which you request or transmit this token
-   (e.g., in the `Authorization:` header) is left up to the developer at this time.
-
-   Configure your ``DATABASES`` setting as follows::
-
-    'salesforce': {
-        'ENGINE': 'salesforce.backend',
-        'HOST': 'https://your-site.salesforce.com',
-        'CONSUMER_KEY': '.',
-        'CONSUMER_SECRET': '.',
-        'USER': 'dynamic auth',
-        'PASSWORD': '.',
-    }
-
-   A static SFDC connection can be specified with the data server URL in "HOST"
-   Note that in this case we're not using the URL of the login server — the data
-   server URL can be also used for login.
-   
-   Items with `'.'` value are ignored when using dynamic auth, but cannot be left
-   empty.
-
-   The last step is to enable the feature in your project in some way, probably by
-   creating a Django middleware component. Then at the beginning of each request::
-
-      from django.db import connections
-      # After you get the access token for the user in some way
-      # authenticate to SFDC with
-      connections['salesforce'].sf_session.auth.dynamic_start(access_token)
-      
-      # or to override the `instance_url` on a per-request basis
-      connections['salesforce'].sf_session.auth.dynamic_start(access_token, instance_url)
-
-   Make sure to purge the access token at end of request::
-
-        connections['salesforce'].sf_session.auth.dynamic_end()
-
-   You can continue to supply static credentials in your project settings, but they will
-   only be used before calling dynamic_start() and/or after calling dynamic_end().
 
 Backwards-incompatible changes
 ------------------------------
 
--  The name of primary key is currently `id`. The backward compatible behaviour
-   can be reached by settings `SF_PK='Id'`.
+-  v0.8: The default Meta option if now ``managed = True``, which is an unimportant
+   change for Salesforce databases (see about Migrations above).
+
+   Completely different implementation of raw queries and cursor that compatible
+   with normal databases. (a more backward compatible option can be added if
+   it will be required)
+
+   Custom exception classes has been moved to ``salesforce.dbapi.exceptions``.
+
+-  v0.7.2: This is the last code that supports old Django 1.8.4+ and 1.9
+
+-  v0.6.9: This is the last code that supports old Django 1.7 and 1.8.0 - 1.8.3
+
+-  v0.6.1: This is the last code that supports old Django 1.4, 1.5, 1.6.
+
+-  v0.5: The name of primary key is currently ``'id'``. The backward compatible
+   behavior for code created before v0.5 can be reached by settings ``SF_PK='Id'``.
+
+

@@ -6,14 +6,17 @@
 #
 
 """
-TODO: command-line SOQL interface.
+(empty) Module for command-line dbshell  (like django.db.backends.*.client)
 """
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.backends import BaseDatabaseClient
+from django.db.backends.base.client import BaseDatabaseClient
+
 
 def complain(*args, **kwargs):
-	raise ImproperlyConfigured("DatabaseClient: Not yet implemented for the Salesforce backend.")
+    raise ImproperlyConfigured("DatabaseClient: Not yet implemented for the Salesforce backend.")
+
 
 class DatabaseClient(BaseDatabaseClient):
-	runshell = complain
+    # pylint:disable=too-few-public-methods
+    runshell = complain
