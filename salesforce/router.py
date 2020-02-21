@@ -71,10 +71,12 @@ class ModelRouter(object):
         """
         Don't attempt to sync SF models to non SF databases and vice versa.
         """
-        if 'model' in hints:
-            model = hints['model']
-        elif model_name:
+        if model_name:
             model = apps.get_model(app_label, model_name)
+        elif 'model' in hints:
+            # hints are used with less priority, because many hints are dynamic
+            # models on a '__fake__' module which are not SalesforceModels
+            model = hints['model']
         else:
             # in data migrations
             model = None
@@ -84,7 +86,7 @@ class ModelRouter(object):
             if not (is_sf_database(db) or db == self.sf_alias):
                 return False
         else:
-            if is_sf_database(db):
+            if is_sf_database(db) or self.sf_alias != 'default' and db == self.sf_alias:
                 return False
         # TODO: It is usual that syncdb is currently disallowed for SF but in
         # the future it can be allowed to do deep check of compatibily Django
