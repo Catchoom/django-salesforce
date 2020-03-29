@@ -114,12 +114,16 @@ def convert_lead(lead, converted_status=None, **kwargs):
     else:
         soap_client.login(settings_dict['USER'], settings_dict['PASSWORD'])
 
-    response = soap_client.convertLead({
+    params = {
         'leadId': lead.pk,
         'convertedStatus': converted_status,
         'doNotCreateOpportunity': True,
         'ownerId': settings.SALESFORCE_OWNER_ID,
-    })
+    }
+    
+    params.update(**kwargs)
+        
+    response = soap_client.convertLead(params)
 
     ret = dict((x._name[1], str(x)) for x in response)
 
